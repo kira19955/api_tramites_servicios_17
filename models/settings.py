@@ -15,4 +15,4 @@ class Settings(models.Model):
     password = fields.Char('Password')
     tipo = fields.Char('Tipo')
     ip = fields.Char('Ip')
-    page = fields.Char('Pagina')
+    page = fields.Integer('Página', default=1)

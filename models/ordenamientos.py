@@ -14,4 +14,4 @@ class Ordenamientos(models.Model):
     letra = fields.Char(string='Letra')
     otro = fields.Char(string='Otro')
 
-    service_id = fields.Many2one('servicios', string='Service')
+    service_id = fields.Many2one('api_tramites_servicios_17.servicios', string='Service')

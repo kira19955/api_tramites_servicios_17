@@ -16,7 +16,7 @@ class ServiciosController(http.Controller):
         for servicio in servicios:
             servicios_data.append({
                 'id': servicio.id_servicios,
-                'nombre': servicio.name,
+                'nombre': servicio.nombre,
                 'homoclave': servicio.homoclave,
                 'categoria': servicio.categoria,
                 'modalidad': servicio.modalidad,
