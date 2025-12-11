@@ -6,47 +6,60 @@ import logging
 _logger = logging.getLogger(__name__)
 
 class Servicios(models.Model):
-    _name = 'servicios'
+    _name = 'api_tramites_servicios_17.servicios'
 
     id_servicios = fields.Char(string='Id')
-    name = fields.Char(string='Nombre')
+    nombre = fields.Char(string='Nombre')
     homoclave = fields.Char(string='Homoclave')
     categoria = fields.Char(string='Categoria')
     modalidad = fields.Char(string='Modalidad')
-    sujeto_obligado = fields.Char(string='Sujeto Obligado')
-    descripcion_ciudadana = fields.Text(string='Descripcion ciudadana')
-    tra_fecha_modificacion = fields.Datetime(string='traFechaModificacion')
+    sujetoObligado = fields.Char(string='Sujeto Obligado')
+    descripcionCiudadana = fields.Text(string='Descripcion ciudadana')
+    traFechaModificacion = fields.Datetime(string='traFechaModificacion')
 
     ordenamientos_ids = fields.One2many(
-        'ordenamientos',
+        'api_tramites_servicios_17.ordenamientos',
         'service_id',
         string='Ordenamientos'
     )
 
-    ficha_id = fields.Many2one('tramite', string='Ficha')
+    #ficha_id = fields.Many2one('tramite', string='Ficha')
     ficha = fields.Boolean(string="Tiene Ficha", default= False)
 
     @api.model
     def execute_cron(self):
         """Método que será llamado por el cron. Obtiene el token y realiza la solicitud de la página correspondiente."""
+        
         token = self.obtain_token()
+        
         if token:
             self.call_single_page(token)
+            _logger.info("Token obtenido correctamente:", token)
+            
         else:
             _logger.info("Error: No se obtuvo el token.")
 
     def obtain_token(self):
-        """Realiza la solicitud para obtener el token."""
-        url_token = "https://www.catalogonacional.gob.mx/sujetosobligados/api/Login"
+        """Realiza la solicitud para obtener el token desde los datos almacenados en el modelo."""
+       
+        settings = self.env['api_tramites_servicios_17.settings'].search([], limit=1)
+        
+        if not settings:
+            _logger.info("No se encontraron configuraciones para obtener el token.")
+            return None
+
         payload_token = json.dumps({
-            "Usuario": "api.veracruz.xalapa",
-            "Password": "D1*yR7jM4vQ2nX9sA+kT6pWf8",
-            "Tipo": "Correo",
-            "Ip": "0.0.0.0"
+            "Usuario": settings.usuario,
+            "Password": settings.password,
+            "Tipo": settings.tipo,
+            "Ip": settings.ip
         })
+
         headers_token = {
             'Content-Type': 'application/json'
         }
+
+        url_token = "https://www.catalogonacional.gob.mx/sujetosobligados/api/Login"
 
         try:
             response_token = requests.post(url_token, headers=headers_token, data=payload_token)
@@ -102,7 +115,7 @@ class Servicios(models.Model):
                             
                             for ordenamiento in ordenamientos_data:
                                 try:
-                                    self.env['ordenamientos'].create({
+                                    self.env['api_tramites_servicios_17.ordenamientos'].create({
                                         'id_ordenamiento': ordenamiento.get('id'),
                                         'nombre': ordenamiento.get('nombre'),
                                         'articulo': ordenamiento.get('articulo'),
@@ -219,7 +232,7 @@ class Servicios(models.Model):
         
         try:
             # Ejecutar reset de fichas (sin eliminar registros)
-            reset_result = self.env['servicios'].reset_fichas_processing(delete_records=False)
+            reset_result = self.env['api_tramites_servicios_17.servicios'].reset_fichas_processing(delete_records=False)
             
             if reset_result:
                 _logger.info("✅ Reset de fichas ejecutado exitosamente")
@@ -247,94 +260,3 @@ class Servicios(models.Model):
             import traceback
             _logger.error(f"Traceback: {traceback.format_exc()}")
             return False
-
-    @api.model
-    def test_single_page_processing(self, page_number=1):
-        """Método de prueba para procesar una página específica manualmente."""
-        _logger.info(f"Iniciando procesamiento de prueba para página {page_number}")
-        
-        try:
-            # Obtener token
-            token = self.obtain_token()
-            if not token:
-                _logger.error("No se pudo obtener el token")
-                return False
-            
-            # Procesar página específica
-            headers_consulta = {
-                'Authorization': f'Bearer {token}'
-            }
-            
-            url_consulta = f"https://www.catalogonacional.gob.mx/sujetosobligados/api/ConsultaTramites/Id_nom_cat_dep_hom/all/{page_number}"
-            _logger.info(f"Consultando URL: {url_consulta}")
-            
-            response_consulta = requests.get(url_consulta, headers=headers_consulta)
-            _logger.info(f"Response status: {response_consulta.status_code}")
-            
-            if response_consulta.status_code == 200:
-                data = response_consulta.json().get('data', [])
-                _logger.info(f"Procesando {len(data)} servicios de la página {page_number}")
-                
-                servicios_procesados = 0
-                servicios_con_error = 0
-                
-                for index, item in enumerate(data):
-                    try:
-                        _logger.info(f"Procesando servicio {index + 1}/{len(data)}: {item.get('nombre', 'Sin nombre')}")
-                        
-                        # Crear o actualizar el servicio
-                        servicio = self.create_or_update_service(item)
-                        _logger.info(f"Servicio creado/actualizado: ID {servicio.id}, Nombre: {servicio.name}")
-                        
-                        # Procesar ordenamientos
-                        ordenamientos_data = item.get('ordenamientos', [])
-                        ordenamientos_creados = 0
-                        
-                        for ordenamiento in ordenamientos_data:
-                            try:
-                                self.env['ordenamientos'].create({
-                                    'id_ordenamiento': ordenamiento.get('id'),
-                                    'nombre': ordenamiento.get('nombre'),
-                                    'articulo': ordenamiento.get('articulo'),
-                                    'fraccion': ordenamiento.get('fraccion'),
-                                    'insiso': ordenamiento.get('insiso'),
-                                    'parrafo': ordenamiento.get('parrafo'),
-                                    'numero': ordenamiento.get('numero'),
-                                    'letra': ordenamiento.get('letra'),
-                                    'otro': ordenamiento.get('otro'),
-                                    'service_id': servicio.id
-                                })
-                                ordenamientos_creados += 1
-                            except Exception as ordenamiento_error:
-                                _logger.error(f"Error creando ordenamiento para servicio {servicio.id}: {str(ordenamiento_error)}")
-                        
-                        _logger.info(f"Ordenamientos creados para servicio {servicio.id}: {ordenamientos_creados}")
-                        servicios_procesados += 1
-                        
-                    except Exception as servicio_error:
-                        _logger.error(f"Error procesando servicio {index + 1}: {str(servicio_error)}")
-                        servicios_con_error += 1
-                        continue
-                
-                _logger.info(f"Página {page_number} procesada: {servicios_procesados} exitosos, {servicios_con_error} con errores")
-                return True
-                
-            else:
-                _logger.error(f"Error al realizar la consulta de la página {page_number}: {response_consulta.status_code}")
-                return False
-                
-        except Exception as e:
-            _logger.error(f"Exception occurred while testing page {page_number}: {str(e)}")
-            import traceback
-            _logger.error(f"Traceback: {traceback.format_exc()}")
-            return False
-
-
-
-
-
-class Pagina(models.Model):
-    _name = 'pagina'
-    _description = 'Almacena el número de página para las consultas'
-
-    numero_pagina = fields.Integer(string='Número de Página', default=1)

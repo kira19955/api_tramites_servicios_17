@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- View settings View Tree -->
+    <record id="view_settings_tree" model="ir.ui.view">
+        <field name="name">view.settings.tree</field>
+        <field name="model">api_tramites_servicios_17.settings</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="usuario"/>
+                <field name="password"/>
+                <field name="tipo"/>
+                <field name="ip"/>
+                <field name="page"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- View settings form -->
+    <record id="view_settings_form" model="ir.ui.view">
+        <field name="name">view.settings.form</field>
+        <field name="model">api_tramites_servicios_17.settings</field>
+        <field name="arch" type="xml">
+            <form string="Settings">
+                <sheet>
+                    <group>
+                        <field name="usuario"/>
+                        <field name="password"/>
+                        <field name="tipo"/>
+                        <field name="ip"/>
+                        <field name="page"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action settings -->
+    <record id="action_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">api_tramites_servicios_17.settings</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+    
+
+</odoo>

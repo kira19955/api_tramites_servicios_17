@@ -5,7 +5,7 @@
          <record id="servicios_action" model="ir.actions.act_window">
            <field name="name">servicios</field>
            <field name="type">ir.actions.act_window</field>
-           <field name="res_model">servicios</field>
+           <field name="res_model">api_tramites_servicios_17.servicios</field>
            <field name="view_mode">tree,form</field>
        </record>
 
@@ -13,17 +13,9 @@
        <record id="ordenamientos_action" model="ir.actions.act_window">
            <field name="name">ordenamientos</field>
            <field name="type">ir.actions.act_window</field>
-           <field name="res_model">ordenamientos</field>
+           <field name="res_model">api_tramites_servicios_17.ordenamientos</field>
            <field name="view_mode">tree,form</field>
        </record>
-
-        <record id="pagina_action" model="ir.actions.act_window">
-           <field name="name">pagina</field>
-           <field name="type">ir.actions.act_window</field>
-           <field name="res_model">pagina</field>
-           <field name="view_mode">tree,form</field>
-       </record>
-
 
     <!-- Menú principal para API SERVICIOS -->
     <menuitem id="api_servicios_menu" name="API SERVICIOS"/>
@@ -31,13 +23,13 @@
     <!-- Menús secundarios para cada modelo -->
     <menuitem id="servicios_api" name="Servicios" parent="api_servicios_menu" action="servicios_action" sequence="1"/>
     <menuitem id="categorias_api" name="Ordenamientos" parent="api_servicios_menu" action="ordenamientos_action" sequence="2"/>
-    <menuitem id="pagina" name="pagina" parent="api_servicios_menu" action="pagina_action" sequence="3"/>
+    <menuitem id="settings_api" name="Settings" parent="api_servicios_menu" action="action_settings" sequence="3"/>
 
 
 
         <record id="ir_cron_execute_api_calls" model="ir.cron">
             <field name="name">Execute API Calls</field>
-            <field name="model_id" ref="model_servicios"/> <!-- Asegúrate de que esta referencia sea correcta -->
+            <field name="model_id" ref="model_api_tramites_servicios_17_servicios"/> <!-- Asegúrate de que esta referencia sea correcta -->
             <field name="state">code</field>
             <field name="code">model.execute_cron()</field>  <!-- Aquí es donde corregimos el método -->
             <field name="interval_number">5</field> <!-- Intervalo de tiempo -->
@@ -48,14 +40,9 @@
         </record>
 
 
-
-        <record id="default_pagina" model="pagina">
-            <field name="numero_pagina">1</field>
-        </record>
-
         <record id="ir_cron_activate_api_calls" model="ir.cron">
         <field name="name">Activar API Calls Cron</field>
-        <field name="model_id" ref="model_servicios"/> <!-- Referencia correcta a 'servicios' -->
+        <field name="model_id" ref="model_api_tramites_servicios_17_servicios"/> <!-- Referencia correcta a 'servicios' -->
         <field name="state">code</field>
         <field name="code">model.activate_cron()</field>
         <field name="interval_number">15</field> <!-- Intervalo de tiempo -->
@@ -69,7 +56,7 @@
 
         <record id="ir_cron_execute_api_calls_ficha" model="ir.cron">
             <field name="name">Execute API Calls Ficha</field>
-            <field name="model_id" ref="model_servicios"/> <!-- Asegúrate de que esta referencia sea correcta -->
+            <field name="model_id" ref="model_api_tramites_servicios_17_servicios"/> <!-- Asegúrate de que esta referencia sea correcta -->
             <field name="state">code</field>
             <field name="code">model.execute_cron_ficha()</field>  <!-- Aquí es donde corregimos el método -->
             <field name="interval_number">15</field> <!-- Intervalo de tiempo aumentado -->

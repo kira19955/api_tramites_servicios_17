@@ -2,7 +2,7 @@ from odoo import fields, models, api
 
 
 class Ordenamientos(models.Model):
-    _name = 'ordenamientos'
+    _name = 'api_tramites_servicios_17.ordenamientos'
 
     id_ordenamiento = fields.Char(string='Id')
     nombre = fields.Char(string='Ordenamiento Name')
