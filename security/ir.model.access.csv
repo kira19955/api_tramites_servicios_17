@@ -2,3 +2,4 @@ id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
 access_servicios_manager,servicios_manager,model_api_tramites_servicios_17_servicios,,1,1,1,1
 access_ordenamientos_manager,ordenamientos_manager,model_api_tramites_servicios_17_ordenamientos,,1,1,1,1
 access_settings_manager,settings_manager,model_api_tramites_servicios_17_settings,,1,1,1,1
+access_tramite_manager,tramite_manager,model_api_tramites_servicios_17_tramite,,1,1,1,1

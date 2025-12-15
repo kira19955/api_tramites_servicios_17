@@ -7,7 +7,7 @@ _logger = logging.getLogger(__name__)
 
 
 class Tramite(models.Model):
-    _inherit = 'servicios'  # Asegurando herencia para métodos adicionales si aplica
+    _inherit = 'api_tramites_servicios_17.servicios'  # Asegurando herencia para métodos adicionales si aplica
 
     @api.model
     def execute_cron_ficha(self):
@@ -16,12 +16,13 @@ class Tramite(models.Model):
         
         try:
             token = self.obtain_token_ficha()
+            _logger.info(token)
             if not token:
                 _logger.error("Error: No se obtuvo el token.")
                 return False
             
             # Buscar servicios que NO tienen ficha, limitado a 20
-            servicios_sin_ficha = self.env['servicios'].search([
+            servicios_sin_ficha = self.env['api_tramites_servicios_17.servicios'].search([
                 ('ficha', '=', False),
                 ('homoclave', '!=', False)
             ], limit=20, order='id')  # Ordenar por ID para consistencia
@@ -34,7 +35,7 @@ class Tramite(models.Model):
                 
                 for servicio in servicios_sin_ficha:
                     try:
-                        _logger.info(f"Procesando ficha para servicio: {servicio.name} (Homoclave: {servicio.homoclave})")
+                        _logger.info(f"Procesando ficha para servicio: {servicio.nombre} (Homoclave: {servicio.homoclave})")
                         self.call_single_page_ficha(token, servicio.homoclave)
                         servicios_procesados += 1
                         
@@ -43,14 +44,14 @@ class Tramite(models.Model):
                         time.sleep(1)  # 1 segundo entre requests
                         
                     except Exception as e:
-                        _logger.error(f"Error procesando ficha para servicio {servicio.name}: {str(e)}")
+                        _logger.error(f"Error procesando ficha para servicio {servicio.nombre}: {str(e)}")
                         servicios_con_error += 1
                         continue
                 
                 _logger.info(f"Fichas procesadas: {servicios_procesados} exitosos, {servicios_con_error} con errores")
                 
                 # Verificar si quedan más servicios sin ficha
-                servicios_restantes = self.env['servicios'].search_count([
+                servicios_restantes = self.env['api_tramites_servicios_17.servicios'].search_count([
                     ('ficha', '=', False),
                     ('homoclave', '!=', False)
                 ])
@@ -59,7 +60,7 @@ class Tramite(models.Model):
                 
                 # Si no quedan más servicios sin ficha, desactivar el cron
                 if servicios_restantes == 0:
-                    cron = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls_ficha', raise_if_not_found=False)
+                    cron = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_ficha', raise_if_not_found=False)
                     if cron:
                         cron.sudo().write({'active': False})
                         _logger.info("Cron desactivado: no quedan servicios sin ficha")
@@ -75,73 +76,6 @@ class Tramite(models.Model):
             _logger.error(f"Error en execute_cron_ficha: {str(e)}")
             import traceback
             _logger.error(f"Traceback: {traceback.format_exc()}")
-            return False
-
-    @api.model
-    def reset_fichas_processing(self, delete_records=False):
-        """Método para reiniciar el procesamiento de fichas (marcar todos como sin ficha)"""
-        _logger.info("Reiniciando procesamiento de fichas - marcando todos los servicios como sin ficha")
-        
-        try:
-            # Marcar todos los servicios como sin ficha
-            servicios_actualizados = self.env['servicios'].search([])
-            servicios_actualizados.write({
-                'ficha': False,
-                'ficha_id': False
-            })
-            
-            _logger.info(f"Marcados {len(servicios_actualizados)} servicios como sin ficha")
-            
-            # Solo eliminar trámites si se especifica explícitamente
-            if delete_records:
-                tramites_eliminados = self.env['tramite'].search([])
-                tramites_eliminados.unlink()
-                _logger.info(f"Eliminados {len(tramites_eliminados)} trámites existentes")
-            else:
-                _logger.info("Trámites existentes conservados - solo se marcaron servicios como sin ficha")
-            
-            # Reactivar el cron
-            cron = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls_ficha', raise_if_not_found=False)
-            if cron:
-                cron.sudo().write({'active': True})
-                _logger.info("Cron de fichas reactivado")
-            
-            return True
-            
-        except Exception as e:
-            _logger.error(f"Error en reset_fichas_processing: {str(e)}")
-            return False
-
-    @api.model
-    def test_ficha_processing_batch(self, limit=5):
-        """Método de prueba para procesar un lote específico de fichas"""
-        _logger.info(f"Iniciando procesamiento de prueba para {limit} fichas")
-        
-        try:
-            token = self.obtain_token_ficha()
-            if not token:
-                _logger.error("No se pudo obtener el token")
-                return False
-            
-            # Buscar servicios sin ficha limitado
-            servicios_sin_ficha = self.env['servicios'].search([
-                ('ficha', '=', False),
-                ('homoclave', '!=', False)
-            ], limit=limit, order='id')
-            
-            _logger.info(f"Procesando {len(servicios_sin_ficha)} servicios de prueba")
-            
-            for servicio in servicios_sin_ficha:
-                try:
-                    _logger.info(f"Procesando: {servicio.name} ({servicio.homoclave})")
-                    self.call_single_page_ficha(token, servicio.homoclave)
-                except Exception as e:
-                    _logger.error(f"Error procesando {servicio.name}: {str(e)}")
-            
-            return True
-            
-        except Exception as e:
-            _logger.error(f"Error en test_ficha_processing_batch: {str(e)}")
             return False
 
     def obtain_token_ficha(self):
@@ -174,7 +108,6 @@ class Tramite(models.Model):
             'Authorization': f'Bearer {token}'
         }
         url_consulta = f"https://www.catalogonacional.gob.mx/sujetosobligados/api/Tramites/ficha/publica/actual/{homoclave}"
-        #"https://catalogonacional.gob.mx/sujetosobligados/api/Tramites/ficha/publica/actual/AX-2022-8821-006-A"
 
         try:
             response = requests.get(url_consulta, headers=headers)
@@ -226,16 +159,16 @@ class Tramite(models.Model):
             'fechaActualizacion': data.get('fechaActualizacion'),
         }
 
-        tramite = self.env['tramite'].search([('homoclave', '=', tramite_vals['homoclave'])], limit=1)
+        tramite = self.env['api_tramites_servicios_17.tramite'].search([('homoclave', '=', tramite_vals['homoclave'])], limit=1)
         if tramite:
             tramite.sudo().write(tramite_vals)
         else:
-            tramite = self.env['tramite'].sudo().create(tramite_vals)
+            tramite = self.env['api_tramites_servicios_17.tramite'].sudo().create(tramite_vals)
 
         self.create_related_records_ficha(tramite, data)
 
         # Actualizar el campo `ficha_id` en `servicios` usando `homoclave`
-        servicio = self.env['servicios'].search([('homoclave', '=', tramite.homoclave)], limit=1)
+        servicio = self.env['api_tramites_servicios_17.servicios'].search([('homoclave', '=', tramite.homoclave)], limit=1)
         if servicio:
             servicio.ficha_id = tramite.id
             servicio.ficha = True
@@ -460,7 +393,7 @@ class Tramite(models.Model):
             })
 
 class Tramite(models.Model):
-    _name = 'tramite'
+    _name = 'api_tramites_servicios_17.tramite'
     _description = 'Trámite'
 
     id = fields.Char(string='ID')
@@ -518,14 +451,14 @@ class TramiteCriterioResolucion(models.Model):
     _name = 'tramite.criterioresolucion'
     _description = 'Criterio de Resolución'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
 
 
 class TramiteCosto(models.Model):
     _name = 'tramite.costo'
     _description = 'Costos del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     monto = fields.Char(string='monto')
     moneda = fields.Char(string='moneda')
     tipoCosto = fields.Char(string='tipoCosto')
@@ -552,7 +485,7 @@ class TramiteOpcion(models.Model):
     _name = 'tramite.opcion'
     _description = 'Opciones para Realizar Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     opcionRealizarTramite = fields.Char(string='opcionRealizarTramite')
     permiteAgendarCita = fields.Char(string='permiteAgendarCita')
     agendarCitaEnLinea = fields.Char(string='agendarCitaEnLinea')
@@ -593,7 +526,7 @@ class TramiteOficina(models.Model):
     _name = 'tramite.oficina'
     _description = 'Oficinas de Atención para Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     id = fields.Char(string='ID')
     nombre = fields.Char(string='nombre')
     direccion = fields.Char(string='direccion')
@@ -616,7 +549,7 @@ class TramiteContacto(models.Model):
     _name = 'tramite.contacto'
     _description = 'Contactos para Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     nombre = fields.Char(string='nombre')
     apellidoP = fields.Char(string='apellidoP')
     apellidoM = fields.Char(string='apellidoM')
@@ -632,7 +565,7 @@ class TramiteRequisito(models.Model):
     _name = 'tramite.requisito'
     _description = 'Requisitos del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     nombre = fields.Char(string='nombre')
     descripcion = fields.Char(string='descripcion')
     original = fields.Char(string='original')
@@ -661,7 +594,7 @@ class TramiteFormato(models.Model):
     _name = 'tramite.formato'
     _description = 'Formatos del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     nombre = fields.Char(string='nombre')
     identificador = fields.Char(string='identificador')
     url = fields.Char(string='url')
@@ -678,7 +611,7 @@ class TramiteFundamento(models.Model):
     _name = 'tramite.fundamento'
     _description = 'Fundamento del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     tramiteId = fields.Char(string='tramiteId')
     tipo = fields.Char(string='tipo')
     requisitoId = fields.Char(string='requisitoId')
@@ -703,7 +636,7 @@ class TramitePlazo(models.Model):
     _name = 'tramite.plazo'
     _description = 'Plazos del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     nombrePlazo = fields.Char(string='nombrePlazo')
     respuestaResolver = fields.Char(string='respuestaResolver')
     paraPrevenir = fields.Char(string='paraPrevenir')
@@ -715,7 +648,7 @@ class TramiteVigencia(models.Model):
     _name = 'tramite.vigencia'
     _description = 'Vigencia del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     vigenciaTramite = fields.Char(string='vigenciaTramite')
 
 
@@ -723,7 +656,7 @@ class TramiteSolicita(models.Model):
     _name = 'tramite.solicita'
     _description = 'Solicitante del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     quienSolicita = fields.Char(string='quienSolicita')
     casoRealizaTramite = fields.Char(string='casoRealizaTramite')
     descripcionVinculada = fields.Char(string='descripcionVinculada')
@@ -734,7 +667,7 @@ class TramiteConservarInformacion(models.Model):
     _name = 'tramite.conservar_informacion'
     _description = 'Conservar Información del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
     requiereConservar = fields.Char(string='requiereConservar')
     finesParaConservar = fields.Char(string='finesParaConservar')
     descripcion = fields.Char(string='descripcion')
@@ -744,7 +677,7 @@ class TramiteSolicitud(models.Model):
     _name = 'tramite.solicitud'
     _description = 'Solicitudes del Trámite'
 
-    tramite_id = fields.Many2one('tramite', string='Trámite')
+    tramite_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Trámite')
 
 
 ##############################################################################

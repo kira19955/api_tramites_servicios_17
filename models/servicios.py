@@ -23,7 +23,7 @@ class Servicios(models.Model):
         string='Ordenamientos'
     )
 
-    #ficha_id = fields.Many2one('tramite', string='Ficha')
+    ficha_id = fields.Many2one('api_tramites_servicios_17.tramite', string='Ficha')
     ficha = fields.Boolean(string="Tiene Ficha", default= False)
 
     @api.model
@@ -106,7 +106,8 @@ class Servicios(models.Model):
                     settings.page = 1
 
                     try:
-                        cron_id = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls', raise_if_not_found=False)
+                        cron_id = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls',
+                                               raise_if_not_found=False)
                         if cron_id:
                             cron_id.sudo().write({'active': False})
                             _logger.info("✅ El cron fue desactivado automáticamente (fin de la paginación)")
@@ -126,12 +127,19 @@ class Servicios(models.Model):
                         servicio = self.create_or_update_service(item)
                         _logger.info(f"Servicio creado/actualizado: ID {servicio.id}, Nombre: {servicio.nombre}")
 
-                        # Crear ordenamientos
+                        # Crear o actualizar ordenamientos
                         ordenamientos_data = item.get('ordenamientos', [])
                         for ordenamiento in ordenamientos_data:
                             try:
-                                self.env['api_tramites_servicios_17.ordenamientos'].create({
-                                    'id_ordenamiento': ordenamiento.get('id'),
+                                ordenamiento_id = ordenamiento.get('id')
+
+                                # Buscar si ya existe este ordenamiento para el servicio
+                                existing = self.env['api_tramites_servicios_17.ordenamientos'].search([
+                                    ('id_ordenamiento', '=', ordenamiento_id),
+                                    ('service_id', '=', servicio.id)
+                                ], limit=1)
+
+                                valores_ordenamiento = {
                                     'nombre': ordenamiento.get('nombre'),
                                     'articulo': ordenamiento.get('articulo'),
                                     'fraccion': ordenamiento.get('fraccion'),
@@ -141,9 +149,21 @@ class Servicios(models.Model):
                                     'letra': ordenamiento.get('letra'),
                                     'otro': ordenamiento.get('otro'),
                                     'service_id': servicio.id
-                                })
+                                }
+
+                                if existing:
+                                    existing.write(valores_ordenamiento)
+                                    _logger.info(f"🔁 Ordenamiento actualizado: {existing.id}")
+                                else:
+                                    self.env['api_tramites_servicios_17.ordenamientos'].create({
+                                        'id_ordenamiento': ordenamiento_id,
+                                        **valores_ordenamiento
+                                    })
+                                    _logger.info(f"🆕 Ordenamiento creado: {ordenamiento_id}")
+
                             except Exception as e:
-                                _logger.error(f"Error creando ordenamiento para servicio {servicio.id}: {e}")
+                                _logger.error(
+                                    f"Error creando/actualizando ordenamiento para servicio {servicio.id}: {e}")
 
                         servicios_procesados += 1
 
@@ -152,7 +172,8 @@ class Servicios(models.Model):
                         servicios_con_error += 1
                         continue
 
-                _logger.info(f"Página {page_number} procesada: {servicios_procesados} exitosos, {servicios_con_error} con errores")
+                _logger.info(
+                    f"Página {page_number} procesada: {servicios_procesados} exitosos, {servicios_con_error} con errores")
 
                 if servicios_procesados > 0:
                     settings.page += 1
@@ -168,7 +189,6 @@ class Servicios(models.Model):
             _logger.error(f"❌ Error de red o parseo al procesar página {page_number}: {e}")
             import traceback
             _logger.error(f"Traceback: {traceback.format_exc()}")
-
 
     def create_or_update_service(self, data):
         """Crea o actualiza un registro del modelo servicios basado en la data de la API."""
