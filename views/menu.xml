@@ -25,48 +25,5 @@
     <menuitem id="categorias_api" name="Ordenamientos" parent="api_servicios_menu" action="ordenamientos_action" sequence="2"/>
     <menuitem id="settings_api" name="Settings" parent="api_servicios_menu" action="action_settings" sequence="3"/>
 
-
-
-        <record id="ir_cron_execute_api_calls" model="ir.cron">
-            <field name="name">Execute API Calls</field>
-            <field name="model_id" ref="model_api_tramites_servicios_17_cron"/> <!-- Asegúrate de que esta referencia sea correcta -->
-            <field name="state">code</field>
-            <field name="code">model.execute_cron()</field>  <!-- Aquí es donde corregimos el método -->
-            <field name="interval_number">5</field> <!-- Intervalo de tiempo -->
-            <field name="interval_type">minutes</field> <!-- Tipo de intervalo -->
-            <field name="numbercall">-1</field> <!-- Número de llamadas, -1 es infinito -->
-            <field name="doall" eval="False"/>
-            <field name="active" eval="False"/>
-        </record>
-
-
-        <record id="ir_cron_activate_api_calls" model="ir.cron">
-        <field name="name">Activar API Calls Cron</field>
-        <field name="model_id" ref="model_api_tramites_servicios_17_cron"/> <!-- Referencia correcta a 'servicios' -->
-        <field name="state">code</field>
-        <field name="code">model.activate_cron()</field>
-        <field name="interval_number">15</field> <!-- Intervalo de tiempo -->
-        <field name="interval_type">days</field> <!-- Tipo de intervalo -->
-        <field name="numbercall">-1</field> <!-- Número de llamadas, -1 es infinito -->
-        <field name="doall" eval="False"/>
-        <field name="active" eval="True"/>
-    </record>
-
-
-
-        <record id="ir_cron_execute_api_calls_ficha" model="ir.cron">
-            <field name="name">Execute API Calls Ficha</field>
-            <field name="model_id" ref="model_api_tramites_servicios_17_cron"/> <!-- Asegúrate de que esta referencia sea correcta -->
-            <field name="state">code</field>
-            <field name="code">model.execute_cron_ficha()</field>  <!-- Aquí es donde corregimos el método -->
-            <field name="interval_number">15</field> <!-- Intervalo de tiempo aumentado -->
-            <field name="interval_type">minutes</field> <!-- Tipo de intervalo -->
-            <field name="numbercall">-1</field> <!-- Número de llamadas, -1 es infinito -->
-            <field name="doall" eval="False"/>
-            <field name="active" eval="False"/>
-        </record>
-
-
-
     </data>
 </odoo>

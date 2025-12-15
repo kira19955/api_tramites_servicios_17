@@ -9,7 +9,7 @@ class ServiciosController(http.Controller):
         """Devuelve la información del modelo servicios en formato JSON"""
 
         # Buscar todos los registros de servicios
-        servicios = request.env['servicios'].sudo().search([])
+        servicios = request.env['api_tramites_servicios_17.servicios'].sudo().search([])
 
         # Crear una lista con la información de cada servicio
         servicios_data = []
@@ -54,7 +54,7 @@ class TramiteController(http.Controller):
 
     @http.route('/api/tramites/<string:homoclave>', auth='public', type='http', methods=['GET'], csrf=False, cors='*')
     def get_tramite_by_homoclave(self, homoclave):
-        tramite = request.env['tramite'].sudo().search([('homoclave', '=', homoclave)], limit=1)
+        tramite = request.env['api_tramites_servicios_17.tramite'].sudo().search([('homoclave', '=', homoclave)], limit=1)
 
         if not tramite:
             return http.Response(

@@ -2,6 +2,7 @@ from odoo import fields, models, api
 import json
 import requests
 import logging
+import time
 
 _logger = logging.getLogger(__name__)
 
@@ -10,21 +11,11 @@ class CronJobs(models.AbstractModel):
     _name = 'api_tramites_servicios_17.cron'
     _description = 'Funciones para crons'
 
-    @api.model
-    def execute_cron(self):
-        """Método que será llamado por el cron. Obtiene el token y realiza la solicitud de la página correspondiente."""
-
-        token = self.obtain_token()
-
-        if token:
-            self.call_single_page(token)
-            _logger.info("Token obtenido correctamente: %s", token)
-
-        else:
-            _logger.info("Error: No se obtuvo el token.")
-
+    #FUNCIONES DEL CRON PARA LA PRIMERA EJECUCION QUE TRAE
+    # LOS SERVICIOS CON SUS ORDENAMIENTOS SOLICITANDO UN TOKEN
+    #
     def obtain_token(self):
-        """Realiza la solicitud para obtener el token desde los datos almacenados en el modelo."""
+        """Realiza la solicitud para obtener el token desde los datos almacenados en el modelo api_tramites_servicios_17.settings."""
 
         settings = self.env['api_tramites_servicios_17.settings'].search([], limit=1)
 
@@ -59,7 +50,7 @@ class CronJobs(models.AbstractModel):
             return None
 
     def call_single_page(self, token):
-        """Consulta una página de la API externa usando el token, y procesa los servicios recibidos."""
+        """Consulta una página de la API usando el token, y procesa los servicios recibidos."""
 
         headers_consulta = {
             'Authorization': f'Bearer {token}'
@@ -84,7 +75,7 @@ class CronJobs(models.AbstractModel):
             if response.status_code == 200:
                 data = response.json().get('data', [])
 
-                # 🚨 Detectar fin de paginación
+                # Detectar fin de paginación
                 if not data:
                     _logger.info(f"La página {page_number} no contiene datos. Reiniciando página y deteniendo cron.")
                     settings.page = 1
@@ -94,11 +85,11 @@ class CronJobs(models.AbstractModel):
                                                raise_if_not_found=False)
                         if cron_id:
                             cron_id.sudo().write({'active': False})
-                            _logger.info("✅ El cron fue desactivado automáticamente (fin de la paginación)")
+                            _logger.info("El cron fue desactivado automáticamente (fin de la paginación)")
                     except Exception as e:
-                        _logger.error(f"❌ No se pudo desactivar el cron automáticamente: {str(e)}")
+                        _logger.error(f"No se pudo desactivar el cron automáticamente: {str(e)}")
 
-                    return  # ⛔️ Salimos de la función para no seguir
+                    return  # Salimos de la función para no seguir
 
                 _logger.info(f"Procesando {len(data)} servicios de la página {page_number}")
 
@@ -137,17 +128,16 @@ class CronJobs(models.AbstractModel):
 
                                 if existing:
                                     existing.write(valores_ordenamiento)
-                                    _logger.info(f"🔁 Ordenamiento actualizado: {existing.id}")
+                                    _logger.info(f"Ordenamiento actualizado: {existing.id}")
                                 else:
                                     self.env['api_tramites_servicios_17.ordenamientos'].create({
                                         'id_ordenamiento': ordenamiento_id,
                                         **valores_ordenamiento
                                     })
-                                    _logger.info(f"🆕 Ordenamiento creado: {ordenamiento_id}")
+                                    _logger.info(f"Ordenamiento creado: {ordenamiento_id}")
 
                             except Exception as e:
-                                _logger.error(
-                                    f"Error creando/actualizando ordenamiento para servicio {servicio.id}: {e}")
+                                _logger.error(f"Error creando/actualizando ordenamiento para servicio {servicio.id}: {e}")
 
                         servicios_procesados += 1
 
@@ -161,16 +151,16 @@ class CronJobs(models.AbstractModel):
 
                 if servicios_procesados > 0:
                     settings.page += 1
-                    _logger.info(f"✅ Página incrementada a: {settings.page}")
+                    _logger.info(f"Página incrementada a: {settings.page}")
                 else:
-                    _logger.warning("⚠️ No se procesaron servicios exitosamente, la página no se incrementa.")
+                    _logger.warning("No se procesaron servicios exitosamente, la página no se incrementa.")
 
             else:
                 _logger.error(f"Error HTTP al consultar página {page_number}: {response.status_code}")
                 _logger.error(f"Contenido de respuesta: {response.text}")
 
         except Exception as e:
-            _logger.error(f"❌ Error de red o parseo al procesar página {page_number}: {e}")
+            _logger.error(f"Error de red o parseo al procesar página {page_number}: {e}")
             import traceback
             _logger.error(f"Traceback: {traceback.format_exc()}")
 
@@ -224,54 +214,6 @@ class CronJobs(models.AbstractModel):
             _logger.error(f"Datos del servicio: {data}")
             raise
 
-    @api.model
-    def activate_cron(self):
-        """Activa el cron para ejecutar las llamadas a la API si está desactivado."""
-        cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls', raise_if_not_found=False)
-        if cron_id and not cron_id.active:
-            cron_id.sudo().write({'active': True})
-            _logger.info("El cron 'ir_cron_execute_api_calls' ha sido activado.")
-        else:
-            _logger.info("El cron 'ir_cron_execute_api_calls' ya está activo o no se encontró.")
-
-    @api.model
-    def activate_cron_fichas(self):
-        """Activa el cron de fichas y ejecuta reset antes de activar."""
-        _logger.info("🔄 Activando cron de fichas con reset previo...")
-
-        try:
-            # Ejecutar reset de fichas (sin eliminar registros)
-            reset_result = self.env['api_tramites_servicios_17.servicios'].reset_fichas_processing(delete_records=False)
-
-            if reset_result:
-                _logger.info("✅ Reset de fichas ejecutado exitosamente")
-
-                # Verificar que el cron de fichas esté activo
-                cron_ficha = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_ficha',
-                                          raise_if_not_found=False)
-                if cron_ficha:
-                    if not cron_ficha.active:
-                        cron_ficha.sudo().write({'active': True})
-                        _logger.info("✅ Cron de fichas activado")
-                    else:
-                        _logger.info("ℹ️ Cron de fichas ya estaba activo")
-
-                    _logger.info(f"📊 Próxima ejecución del cron: {cron_ficha.nextcall}")
-                    return True
-                else:
-                    _logger.error("❌ No se encontró el cron de fichas")
-                    return False
-            else:
-                _logger.error("❌ Error en el reset de fichas")
-                return False
-
-        except Exception as e:
-            _logger.error(f"❌ Error en activate_cron_fichas: {str(e)}")
-            import traceback
-            _logger.error(f"Traceback: {traceback.format_exc()}")
-            return False
-
-
 
 
 
@@ -309,7 +251,7 @@ class CronJobs(models.AbstractModel):
                         servicios_procesados += 1
 
                         # Delay entre requests para evitar sobrecarga
-                        import time
+
                         time.sleep(1)  # 1 segundo entre requests
 
                     except Exception as e:
@@ -640,3 +582,30 @@ class CronJobs(models.AbstractModel):
             self.env['tramite.solicitud'].sudo().create({
                 'tramite_id': tramite.id,
             })
+
+
+
+#########################################################################################################################################
+    @api.model
+    def execute_cron(self):
+        """Método que será llamado por el cron. Obtiene el token y realiza la solicitud de la página correspondiente."""
+
+        token = self.obtain_token()
+
+        if token:
+            self.call_single_page(token)
+            _logger.info("Token obtenido correctamente: %s", token)
+
+        else:
+            _logger.info("Error: No se obtuvo el token.")
+
+
+    @api.model
+    def activate_cron(self):
+        """Activa el cron para ejecutar las llamadas a la API si está desactivado."""
+        cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls', raise_if_not_found=False)
+        if cron_id and not cron_id.active:
+            cron_id.sudo().write({'active': True})
+            _logger.info("El cron 'ir_cron_execute_api_calls' ha sido activado.")
+        else:
+            _logger.info("El cron 'ir_cron_execute_api_calls' ya está activo o no se encontró.")
