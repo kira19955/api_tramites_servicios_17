@@ -91,84 +91,84 @@ class Servicios(models.Model):
 
         page_number = settings.page or 1  # Asegura que siempre sea al menos 1
 
-        if page_number <= 39:
-            url_consulta = f"https://www.catalogonacional.gob.mx/sujetosobligados/api/ConsultaTramites/Id_nom_cat_dep_hom/all/{page_number}"
+        url_consulta = f"https://www.catalogonacional.gob.mx/sujetosobligados/api/ConsultaTramites/Id_nom_cat_dep_hom/all/{page_number}"
 
-            try:
-                response = requests.get(url_consulta, headers=headers_consulta)
-                _logger.info(f"Response status: {response.status_code}")
+        try:
+            response = requests.get(url_consulta, headers=headers_consulta)
+            _logger.info(f"Response status: {response.status_code}")
 
-                if response.status_code == 200:
-                    data = response.json().get('data', [])
-                    _logger.info(f"Procesando {len(data)} servicios de la página {page_number}")
+            if response.status_code == 200:
+                data = response.json().get('data', [])
 
-                    servicios_procesados = 0
-                    servicios_con_error = 0
+                # 🚨 Detectar fin de paginación
+                if not data:
+                    _logger.info(f"La página {page_number} no contiene datos. Reiniciando página y deteniendo cron.")
+                    settings.page = 1
 
-                    for index, item in enumerate(data):
-                        try:
-                            _logger.info(
-                                f"Procesando servicio {index + 1}/{len(data)}: {item.get('nombre', 'Sin nombre')}")
-                            servicio = self.create_or_update_service(item)
-                            _logger.info(f"Servicio creado/actualizado: ID {servicio.id}, Nombre: {servicio.nombre}")
+                    try:
+                        cron_id = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls', raise_if_not_found=False)
+                        if cron_id:
+                            cron_id.sudo().write({'active': False})
+                            _logger.info("✅ El cron fue desactivado automáticamente (fin de la paginación)")
+                    except Exception as e:
+                        _logger.error(f"❌ No se pudo desactivar el cron automáticamente: {str(e)}")
 
-                            # Crear ordenamientos
-                            ordenamientos_data = item.get('ordenamientos', [])
-                            for ordenamiento in ordenamientos_data:
-                                try:
-                                    self.env['api_tramites_servicios_17.ordenamientos'].create({
-                                        'id_ordenamiento': ordenamiento.get('id'),
-                                        'nombre': ordenamiento.get('nombre'),
-                                        'articulo': ordenamiento.get('articulo'),
-                                        'fraccion': ordenamiento.get('fraccion'),
-                                        'insiso': ordenamiento.get('insiso'),
-                                        'parrafo': ordenamiento.get('parrafo'),
-                                        'numero': ordenamiento.get('numero'),
-                                        'letra': ordenamiento.get('letra'),
-                                        'otro': ordenamiento.get('otro'),
-                                        'service_id': servicio.id
-                                    })
-                                except Exception as e:
-                                    _logger.error(f"Error creando ordenamiento para servicio {servicio.id}: {e}")
+                    return  # ⛔️ Salimos de la función para no seguir
 
-                            servicios_procesados += 1
+                _logger.info(f"Procesando {len(data)} servicios de la página {page_number}")
 
-                        except Exception as e:
-                            _logger.error(f"Error procesando servicio {index + 1}: {e}")
-                            servicios_con_error += 1
-                            continue
+                servicios_procesados = 0
+                servicios_con_error = 0
 
-                    _logger.info(
-                        f"Página {page_number} procesada: {servicios_procesados} exitosos, {servicios_con_error} con errores")
+                for index, item in enumerate(data):
+                    try:
+                        _logger.info(f"Procesando servicio {index + 1}/{len(data)}: {item.get('nombre', 'Sin nombre')}")
+                        servicio = self.create_or_update_service(item)
+                        _logger.info(f"Servicio creado/actualizado: ID {servicio.id}, Nombre: {servicio.nombre}")
 
-                    if servicios_procesados > 0:
-                        settings.page += 1
-                        _logger.info(f"Página incrementada a: {settings.page}")
-                    else:
-                        _logger.warning("No se procesaron servicios exitosamente, la página no se incrementa.")
+                        # Crear ordenamientos
+                        ordenamientos_data = item.get('ordenamientos', [])
+                        for ordenamiento in ordenamientos_data:
+                            try:
+                                self.env['api_tramites_servicios_17.ordenamientos'].create({
+                                    'id_ordenamiento': ordenamiento.get('id'),
+                                    'nombre': ordenamiento.get('nombre'),
+                                    'articulo': ordenamiento.get('articulo'),
+                                    'fraccion': ordenamiento.get('fraccion'),
+                                    'insiso': ordenamiento.get('insiso'),
+                                    'parrafo': ordenamiento.get('parrafo'),
+                                    'numero': ordenamiento.get('numero'),
+                                    'letra': ordenamiento.get('letra'),
+                                    'otro': ordenamiento.get('otro'),
+                                    'service_id': servicio.id
+                                })
+                            except Exception as e:
+                                _logger.error(f"Error creando ordenamiento para servicio {servicio.id}: {e}")
 
+                        servicios_procesados += 1
+
+                    except Exception as e:
+                        _logger.error(f"Error procesando servicio {index + 1}: {e}")
+                        servicios_con_error += 1
+                        continue
+
+                _logger.info(f"Página {page_number} procesada: {servicios_procesados} exitosos, {servicios_con_error} con errores")
+
+                if servicios_procesados > 0:
+                    settings.page += 1
+                    _logger.info(f"✅ Página incrementada a: {settings.page}")
                 else:
-                    _logger.error(f"Error HTTP al consultar página {page_number}: {response.status_code}")
-                    _logger.error(f"Contenido de respuesta: {response.text}")
+                    _logger.warning("⚠️ No se procesaron servicios exitosamente, la página no se incrementa.")
 
-            except Exception as e:
-                _logger.error(f"Error de red o parseo al procesar página {page_number}: {e}")
-                import traceback
-                _logger.error(f"Traceback: {traceback.format_exc()}")
+            else:
+                _logger.error(f"Error HTTP al consultar página {page_number}: {response.status_code}")
+                _logger.error(f"Contenido de respuesta: {response.text}")
 
-        else:
-            # Si se alcanza la página 40, reiniciamos y desactivamos el cron
-            settings.page = 1
-            _logger.info("Página reiniciada a 1")
+        except Exception as e:
+            _logger.error(f"❌ Error de red o parseo al procesar página {page_number}: {e}")
+            import traceback
+            _logger.error(f"Traceback: {traceback.format_exc()}")
 
-            try:
-                cron_id = self.env.ref(
-                    'tramites_servicios_ayto.ir_cron_execute_api_calls')  # Asegúrate que este XML ID exista
-                if cron_id:
-                    cron_id.sudo().write({'active': False})
-                    _logger.info("El cron fue desactivado automáticamente al llegar a la página 40.")
-            except Exception as e:
-                _logger.error(f"No se pudo desactivar el cron automáticamente: {str(e)}")
 
     def create_or_update_service(self, data):
         """Crea o actualiza un registro del modelo servicios basado en la data de la API."""
@@ -223,7 +223,7 @@ class Servicios(models.Model):
     @api.model
     def activate_cron(self):
         """Activa el cron para ejecutar las llamadas a la API si está desactivado."""
-        cron_id = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls', raise_if_not_found=False)
+        cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls', raise_if_not_found=False)
         if cron_id and not cron_id.active:
             cron_id.sudo().write({'active': True})
             _logger.info("El cron 'ir_cron_execute_api_calls' ha sido activado.")
@@ -243,7 +243,7 @@ class Servicios(models.Model):
                 _logger.info("✅ Reset de fichas ejecutado exitosamente")
                 
                 # Verificar que el cron de fichas esté activo
-                cron_ficha = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls_ficha', raise_if_not_found=False)
+                cron_ficha = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_ficha', raise_if_not_found=False)
                 if cron_ficha:
                     if not cron_ficha.active:
                         cron_ficha.sudo().write({'active': True})
