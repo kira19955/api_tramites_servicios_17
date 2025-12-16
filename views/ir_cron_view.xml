@@ -2,32 +2,29 @@
 <odoo>
     <data>
 
-       <record id="ir_cron_execute_api_calls" model="ir.cron">
-            <field name="name">Execute API Calls</field>
+        <record id="ir_cron_activate_api_calls_all" model="ir.cron">
+            <field name="name">Activar API Calls Cron</field>
             <field name="model_id" ref="model_api_tramites_servicios_17_cron"/>
             <field name="state">code</field>
-            <field name="code">model.execute_cron()</field>
+            <field name="code">model.activate_cron()</field>
+            <field name="interval_number">15</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field> <!-- Número de llamadas, -1 es infinito -->
+            <field name="doall" eval="False"/>
+            <field name="active" eval="True"/>
+        </record>
+
+       <record id="ir_cron_execute_api_calls_services" model="ir.cron">
+            <field name="name">Execute API Calls services</field>
+            <field name="model_id" ref="model_api_tramites_servicios_17_cron"/>
+            <field name="state">code</field>
+            <field name="code">model.execute_cron_service()</field>
             <field name="interval_number">5</field>
             <field name="interval_type">minutes</field>
             <field name="numbercall">-1</field> <!-- Número de llamadas, -1 es infinito -->
             <field name="doall" eval="False"/>
             <field name="active" eval="False"/>
         </record>
-
-
-        <record id="ir_cron_activate_api_calls" model="ir.cron">
-        <field name="name">Activar API Calls Cron</field>
-        <field name="model_id" ref="model_api_tramites_servicios_17_cron"/>
-        <field name="state">code</field>
-        <field name="code">model.activate_cron()</field>
-        <field name="interval_number">15</field>
-        <field name="interval_type">days</field>
-        <field name="numbercall">-1</field> <!-- Número de llamadas, -1 es infinito -->
-        <field name="doall" eval="False"/>
-        <field name="active" eval="True"/>
-    </record>
-
-
 
         <record id="ir_cron_execute_api_calls_ficha" model="ir.cron">
             <field name="name">Execute API Calls Ficha</field>

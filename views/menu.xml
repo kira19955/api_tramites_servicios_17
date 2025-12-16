@@ -18,7 +18,7 @@
        </record>
 
     <!-- Menú principal para API SERVICIOS -->
-    <menuitem id="api_servicios_menu" name="API SERVICIOS"/>
+    <menuitem id="api_servicios_menu" name="API SERVICIOS" web_icon="api_tramites_servicios_17,static/description/icon.png"/>
 
     <!-- Menús secundarios para cada modelo -->
     <menuitem id="servicios_api" name="Servicios" parent="api_servicios_menu" action="servicios_action" sequence="1"/>

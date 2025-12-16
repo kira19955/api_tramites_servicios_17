@@ -3,6 +3,8 @@ import json
 import requests
 import logging
 import time
+import traceback
+from datetime import datetime
 
 _logger = logging.getLogger(__name__)
 
@@ -10,6 +12,19 @@ _logger = logging.getLogger(__name__)
 class CronJobs(models.AbstractModel):
     _name = 'api_tramites_servicios_17.cron'
     _description = 'Funciones para crons'
+
+    @api.model
+    def execute_cron_service(self):
+        """Método que será llamado por el cron. Obtiene el token y realiza la solicitud de la página correspondiente."""
+
+        token = self.obtain_token()
+
+        if token:
+            self.call_single_page(token)
+            _logger.info("Token obtenido correctamente: %s", token)
+
+        else:
+            _logger.info("Error: No se obtuvo el token.")
 
     #FUNCIONES DEL CRON PARA LA PRIMERA EJECUCION QUE TRAE
     # LOS SERVICIOS CON SUS ORDENAMIENTOS SOLICITANDO UN TOKEN
@@ -81,11 +96,18 @@ class CronJobs(models.AbstractModel):
                     settings.page = 1
 
                     try:
-                        cron_id = self.env.ref('tramites_servicios_ayto.ir_cron_execute_api_calls',
+                        cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_services',
+                                               raise_if_not_found=False)
+
+                        cron_id_ficha = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_ficha',
                                                raise_if_not_found=False)
                         if cron_id:
                             cron_id.sudo().write({'active': False})
                             _logger.info("El cron fue desactivado automáticamente (fin de la paginación)")
+
+                        if cron_id_ficha:
+                            cron_id.sudo().write({'active': True})
+                            _logger.info("El cron fue activado automáticamente (fin de los servicios)")
                     except Exception as e:
                         _logger.error(f"No se pudo desactivar el cron automáticamente: {str(e)}")
 
@@ -161,7 +183,6 @@ class CronJobs(models.AbstractModel):
 
         except Exception as e:
             _logger.error(f"Error de red o parseo al procesar página {page_number}: {e}")
-            import traceback
             _logger.error(f"Traceback: {traceback.format_exc()}")
 
     def create_or_update_service(self, data):
@@ -171,14 +192,14 @@ class CronJobs(models.AbstractModel):
             if not data.get('id'):
                 raise ValueError("ID del servicio es requerido")
 
-            servicio = self.search([('id_servicios', '=', data.get('id'))], limit=1)
+            servicio = self.env['api_tramites_servicios_17.servicios'].search([('id_servicios', '=', data.get('id'))], limit=1)
 
             # Procesar fecha de modificación
             fecha_modificacion = None
             if data.get('traFechaModificacion'):
                 try:
                     # Convertir fecha ISO a formato Odoo
-                    from datetime import datetime
+
                     fecha_str = data.get('traFechaModificacion')
                     # Parsear fecha ISO: 2025-03-07T00:00:00
                     fecha_modificacion = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
@@ -287,7 +308,6 @@ class CronJobs(models.AbstractModel):
 
         except Exception as e:
             _logger.error(f"Error en execute_cron_ficha: {str(e)}")
-            import traceback
             _logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
@@ -587,23 +607,9 @@ class CronJobs(models.AbstractModel):
 
 #########################################################################################################################################
     @api.model
-    def execute_cron(self):
-        """Método que será llamado por el cron. Obtiene el token y realiza la solicitud de la página correspondiente."""
-
-        token = self.obtain_token()
-
-        if token:
-            self.call_single_page(token)
-            _logger.info("Token obtenido correctamente: %s", token)
-
-        else:
-            _logger.info("Error: No se obtuvo el token.")
-
-
-    @api.model
     def activate_cron(self):
         """Activa el cron para ejecutar las llamadas a la API si está desactivado."""
-        cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls', raise_if_not_found=False)
+        cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_services', raise_if_not_found=False)
         if cron_id and not cron_id.active:
             cron_id.sudo().write({'active': True})
             _logger.info("El cron 'ir_cron_execute_api_calls' ha sido activado.")
