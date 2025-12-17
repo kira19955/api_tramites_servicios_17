@@ -96,17 +96,13 @@ class CronJobs(models.AbstractModel):
                     settings.page = 1
 
                     try:
-                        cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_services',
-                                               raise_if_not_found=False)
 
                         cron_id_ficha = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_ficha',
                                                raise_if_not_found=False)
-                        if cron_id:
-                            cron_id.sudo().write({'active': False})
-                            _logger.info("El cron fue desactivado automáticamente (fin de la paginación)")
 
                         if cron_id_ficha:
-                            cron_id.sudo().write({'active': True})
+                            self.reset_all_fichas()
+                            cron_id_ficha.sudo().write({'active': True})
                             _logger.info("El cron fue activado automáticamente (fin de los servicios)")
                     except Exception as e:
                         _logger.error(f"No se pudo desactivar el cron automáticamente: {str(e)}")
@@ -221,7 +217,8 @@ class CronJobs(models.AbstractModel):
 
             if not servicio:
                 _logger.info(f"Creando nuevo servicio: {servicio_data['nombre']} (ID: {servicio_data['id_servicios']})")
-                servicio = self.create(servicio_data)
+                Servicios = self.env['api_tramites_servicios_17.servicios']
+                servicio = Servicios.create(servicio_data)
                 _logger.info(f"Servicio creado exitosamente: {servicio.id}")
             else:
                 _logger.info(f"Actualizando servicio existente: {servicio.nombre} (ID: {servicio.id})")
@@ -240,12 +237,23 @@ class CronJobs(models.AbstractModel):
 
         ###################################################################################################################################
 
+    def reset_all_fichas(self):
+        self.env['api_tramites_servicios_17.servicios'].search([]).write({'ficha': False})
+        _logger.info("Todas las fichas fueron reseteadas a False.")
+
     @api.model
     def execute_cron_ficha(self):
         """Método llamado por el cron. Obtiene el token y realiza la solicitud con la homoclave del modelo `servicios`."""
         _logger.info("*********************INICIANDO PROCESAMIENTO DE FICHAS (20 EN 20)**************************")
 
         try:
+            cron_id = self.env.ref('api_tramites_servicios_17.ir_cron_execute_api_calls_services',
+                                   raise_if_not_found=False)
+
+            if cron_id:
+                cron_id.sudo().write({'active': False})
+                _logger.info("El cron fue desactivado automáticamente (fin de la paginación)")
+
             token = self.obtain_token()
             _logger.info(token)
             if not token:
